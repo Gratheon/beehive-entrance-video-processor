@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const gateVideoStreamURL = "http://localhost:6100/graphql"
+const gateVideoStreamURL = "http://localhost:8900/graphql"
 
 // Structs to hold JSON response from services
 
@@ -28,7 +28,11 @@ type VideoSegment struct {
 
 // Struct to hold the inference results
 type InferenceResult struct {
-	// Define your inference result structure here
+	BeesIn      int `json:"beesIn"`
+	BeesOut     int `json:"beesOut"`
+	VarroaCount int `json:"varroaCount"`
+	WespenCount int `json:"wespenCount"`
+	PollenCount int `json:"pollenCount"`
 }
 
 func main() {
@@ -68,27 +72,46 @@ func processJob() error {
 	//     return fmt.Errorf("error getting inference results: %w", err)
 	// }
 
-	// // Post inference results to the first service
-	// if err := postInferenceResults(inferenceResult); err != nil {
-	//     return fmt.Errorf("error posting inference results: %w", err)
-	// }
+	// Post inference results to the first service
+	if err := postInferenceResults(videoSegment.Id,
+		&InferenceResult{
+			BeesIn:      10,
+			BeesOut:     20,
+			VarroaCount: 30,
+			WespenCount: 40,
+			PollenCount: 50,
+		},
+	); err != nil {
+		return fmt.Errorf("error posting inference results: %w", err)
+	}
 
 	fmt.Println("Processing complete.")
 	return nil
 }
 
 func fetchVideoURL() (*VideoSegment, error) {
-	// Make HTTP request to the GraphQL service
-	resp, err := http.Post(gateVideoStreamURL, "application/json", bytes.NewBuffer([]byte(
-		`{"query": "query { fetchNextUnprocessedVideoSegment { id URL } }"}`,
-	)))
+	// Prepare the request body
+	requestBody := []byte(`{"query": "query { fetchNextUnprocessedVideoSegment { id URL } }"}`)
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("POST", gateVideoStreamURL, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the Content-Type header
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("internal-userid", "1")
+
+	// Make the HTTP request
+	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
-	// log response
-	fmt.Printf("response: %v", resp.Body)
+	// Log response
+	fmt.Printf("response: %v\n", resp.Body)
 
 	// Parse the response
 	var response FetchNextUnprocessedVideoSegmentResponse
@@ -144,9 +167,54 @@ func getInferenceResults() (InferenceResult, error) {
 	return InferenceResult{}, nil
 }
 
-func postInferenceResults(result InferenceResult) error {
-	// Implement logic to post inference results
-	// Make HTTP POST request to the first service
-	// You may use libraries like "net/http" for this
+type UpdateDetectionStatsGQLRequest struct {
+	Id             string          `json:"id"`
+	DetectionStats InferenceResult `json:"detectionStats"`
+}
+
+func postInferenceResults(videoSegmentId string, result *InferenceResult) error {
+	// Define the GraphQL mutation query with variables
+	query := `mutation UpdateDetectionStats($id: ID!, $detectionStats: DetectionStats!) {
+			updateVideoSegmentDetectionStats(id: $id, detectionStats: $detectionStats)
+		}`
+
+	// Encode the GraphQL variables into JSON bytes
+	variablesData, err := json.Marshal(&UpdateDetectionStatsGQLRequest{
+		Id:             videoSegmentId,
+		DetectionStats: *result,
+	})
+	if err != nil {
+		return err
+	}
+
+	// Compose the final GraphQL request payload
+	requestPayload := fmt.Sprintf(`{"operationName":"UpdateDetectionStats", "query": %q, "variables": %s}`, query, string(variablesData))
+
+	// Create a new HTTP request with the GraphQL query as the body
+	req, err := http.NewRequest("POST", gateVideoStreamURL, bytes.NewBuffer([]byte(requestPayload)))
+	if err != nil {
+		return err
+	}
+
+	// Set the Content-Type header to application/json
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("internal-userid", "1")
+
+	// Make the HTTP request
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// print body
+	fmt.Printf("response: %v\n", resp.Body)
+
+	// Check the response status
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+	}
+
 	return nil
 }
