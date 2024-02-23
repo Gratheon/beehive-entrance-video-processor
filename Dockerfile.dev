@@ -1,14 +1,7 @@
-FROM node:16-alpine
+FROM golang:1.22.0-alpine
 
-# Install FFmpeg v5
-RUN apk add --no-cache ffmpeg
 WORKDIR /app
 
-# COPY . /app/
-# RUN npm install
-# RUN npm run build
+EXPOSE 8400
 
-EXPOSE 8900
-EXPOSE 8950
-
-CMD ["npm", "run", "start"]
+CMD ["go", "run", "main.go"]

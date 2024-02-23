@@ -7,15 +7,19 @@ services:
       "go run main.go"
     environment:
       - ENV_ID=dev
-      - PORT=8900
+      - PORT=8400
     # tty: true
     ports:
       - 8400:8400
     volumes:
       - .:/app/
+      - bee-video-volume:/app/tmp
     restart: always
     network_mode: bridge
     networks:
       - gratheon
 networks:
   gratheon:
+
+volumes:
+    bee-video-volume:

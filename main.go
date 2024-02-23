@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-const gateVideoStreamURL = "http://localhost:8900/graphql"
+const gateVideoStreamURL = "http://gate-video-stream:8900/graphql"
 
 // Structs to hold JSON response from services
 
@@ -52,6 +52,8 @@ func main() {
 	}
 }
 
+var i = 0
+
 func processJob() error {
 	// Make request to remote service over HTTP & GraphQL to fetch video URL
 	videoSegment, err := fetchVideoURL()
@@ -62,26 +64,20 @@ func processJob() error {
 	}
 
 	// Download the video file
-	if err := downloadVideo(videoSegment.Id, videoSegment.URL); err != nil {
+	resultFilename, err := downloadVideo(videoSegment.Id, videoSegment.URL)
+	if err != nil {
 		return fmt.Errorf("error downloading video file: %w", err)
 	}
 
-	// // Get inference results
-	// inferenceResult, err := getInferenceResults()
-	// if err != nil {
-	//     return fmt.Errorf("error getting inference results: %w", err)
-	// }
+	// Get inference results
+	inferenceResult, err := getInferenceResults(resultFilename)
+	if err != nil {
+		return fmt.Errorf("error getting inference results: %w", err)
+	}
 
+	i++
 	// Post inference results to the first service
-	if err := postInferenceResults(videoSegment.Id,
-		&InferenceResult{
-			BeesIn:      10,
-			BeesOut:     20,
-			VarroaCount: 30,
-			WespenCount: 40,
-			PollenCount: 50,
-		},
-	); err != nil {
+	if err := postInferenceResults(videoSegment.Id, inferenceResult); err != nil {
 		return fmt.Errorf("error posting inference results: %w", err)
 	}
 
@@ -122,49 +118,57 @@ func fetchVideoURL() (*VideoSegment, error) {
 	return &response.Data.FetchNextUnprocessedVideoSegment, nil
 }
 
-func downloadVideo(id string, videoURL string) error {
+func downloadVideo(id string, videoURL string) (*string, error) {
+	filename := id + ".mp4"
+
 	// Create a directory to store downloaded videos if it doesn't exist
 	err := os.MkdirAll(filepath.Join(".", "tmp"), os.ModePerm)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Create a file to save the video
-	outputPath := filepath.Join(".", "tmp", id+".mp4")
+	outputPath := filepath.Join(".", "tmp", filename)
 	outputFile, err := os.Create(outputPath)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer outputFile.Close()
 
 	// Make HTTP GET request to download the video
 	resp, err := http.Get(videoURL)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	defer resp.Body.Close()
 
 	// Check if the response status code is OK
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("failed to download: %s", resp.Status)
+		return nil, fmt.Errorf("failed to download: %s", resp.Status)
 	}
 
 	// Copy the response body to the file
 	bytesWritten, err := io.Copy(outputFile, resp.Body)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	fmt.Printf("Downloaded %d bytes\n", bytesWritten)
 
-	return nil
+	return &filename, nil
 }
 
-func getInferenceResults() (InferenceResult, error) {
+func getInferenceResults(filename *string) (*InferenceResult, error) {
 	// Implement logic to get inference results
 	// Make HTTP request to another service to get the inference results
 	// You may use libraries like "net/http" for this
-	return InferenceResult{}, nil
+	return &InferenceResult{
+		BeesIn:      i,
+		BeesOut:     20,
+		VarroaCount: 30,
+		WespenCount: 40,
+		PollenCount: 50,
+	}, nil
 }
 
 type UpdateDetectionStatsGQLRequest struct {
