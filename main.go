@@ -11,9 +11,12 @@ import (
 	"time"
 )
 
-const gateVideoStreamURL = "http://gate-video-stream:8900/graphql"
+// check for env var NATIVE
 
-// Structs to hold JSON response from services
+// TODO move to config
+var gateVideoStreamURL = "http://gate-video-stream:8900/graphql"
+var modelURL = "http://models-gate-tracker:9100/"
+var pollInterval = 30 * time.Second
 
 // Struct to hold the response from the GraphQL service
 type FetchNextUnprocessedVideoSegmentResponse struct {
@@ -28,17 +31,28 @@ type VideoSegment struct {
 
 // Struct to hold the inference results
 type InferenceResult struct {
-	BeesIn      int `json:"beesIn"`
-	BeesOut     int `json:"beesOut"`
-	VarroaCount int `json:"varroaCount"`
-	WespenCount int `json:"wespenCount"`
-	PollenCount int `json:"pollenCount"`
+	BeesIn          int `json:"beesIn"`
+	BeesOut         int `json:"beesOut"`
+	VarroaCount     int `json:"varroaCount"`
+	WespenCount     int `json:"wespenCount"`
+	PollenCount     int `json:"pollenCount"`
+	CoolingCount    int `json:"coolingCount"`
+	ProcessedFrames int `json:"processedFrames"`
 }
 
 func main() {
+	if os.Getenv("NATIVE") == "true" {
+		gateVideoStreamURL = "http://localhost:8900/graphql"
+		modelURL = "http://localhost:9100/"
+	}
+
 	// Create a ticker that ticks every 10 seconds
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(pollInterval)
 	defer ticker.Stop()
+
+	//if err := processJob(); err != nil {
+	//	fmt.Println("Error processing job:", err)
+	//}
 
 	// Infinite loop to continuously fetch new jobs
 	for {
@@ -52,8 +66,6 @@ func main() {
 	}
 }
 
-var i = 0
-
 func processJob() error {
 	// Make request to remote service over HTTP & GraphQL to fetch video URL
 	videoSegment, err := fetchVideoURL()
@@ -64,6 +76,8 @@ func processJob() error {
 	}
 
 	// Download the video file
+	// NOTE that this assumes that video is stored on a shared volume into /app/tmp
+	// and models-gate-tracker has access to it
 	resultFilename, err := downloadVideo(videoSegment.Id, videoSegment.URL)
 	if err != nil {
 		return fmt.Errorf("error downloading video file: %w", err)
@@ -75,7 +89,6 @@ func processJob() error {
 		return fmt.Errorf("error getting inference results: %w", err)
 	}
 
-	i++
 	// Post inference results to the first service
 	if err := postInferenceResults(videoSegment.Id, inferenceResult); err != nil {
 		return fmt.Errorf("error posting inference results: %w", err)
@@ -159,16 +172,45 @@ func downloadVideo(id string, videoURL string) (*string, error) {
 }
 
 func getInferenceResults(filename *string) (*InferenceResult, error) {
-	// Implement logic to get inference results
-	// Make HTTP request to another service to get the inference results
-	// You may use libraries like "net/http" for this
-	return &InferenceResult{
-		BeesIn:      i,
-		BeesOut:     20,
-		VarroaCount: 30,
-		WespenCount: 40,
-		PollenCount: 50,
-	}, nil
+	// Prepare the request body
+	requestBody := []byte(
+		fmt.Sprintf(`{"filename": "%s"}`, *filename),
+	)
+
+	// Create a new HTTP request
+	req, err := http.NewRequest("POST", modelURL, bytes.NewBuffer(requestBody))
+	if err != nil {
+		return nil, err
+	}
+
+	// Set the Content-Type header
+	req.Header.Set("Content-Type", "application/json")
+
+	// Make the HTTP request
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	//// Read response body
+	//bodyBytes, err := ioutil.ReadAll(resp.Body)
+	//if err != nil {
+	//	return nil, err
+	//}
+	//
+	//// Log response body
+	//fmt.Printf("Response Body: %s\n", string(bodyBytes))
+
+	// Parse the response
+	var response InferenceResult
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
+		return nil, err
+	}
+
+	fmt.Printf("response: %v\n", response)
+
+	return &response, nil
 }
 
 type UpdateDetectionStatsGQLRequest struct {
