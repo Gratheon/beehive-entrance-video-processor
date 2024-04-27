@@ -7,10 +7,12 @@ Beehive entrance video processing service. Manages video inferencing. Can be dep
 ## Architecture
 
 ### Edge Inference
+We separate webcam from inference mostly because inference is dockerized while webcam uses local window for preview.
 ```mermaid
 flowchart LR
 	subgraph Edge
- 	models-bee-detector[<a href="https://github.com/Gratheon/models-bee-detector">models-bee-detector</a>] --> beehive-entrance-video-processor
+	beehive-entrance-video-processor --"read with native python to file"--> webcam
+	beehive-entrance-video-processor --"run inference from file" --> models-bee-detector[<a href="https://github.com/Gratheon/models-bee-detector">models-bee-detector</a>]
 	end
 	
 	subgraph Cloud
