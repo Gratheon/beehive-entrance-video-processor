@@ -1,12 +1,26 @@
 # beehive-entrance-video-processor
 Beehive entrance video processing service. Manages video inferencing. Can be deployed on edge
 
-## URLs
-- localhost:8400
+
+## Installation
+Edit `video_camera_server.py` and set gate box id and API token.
+
+```bash
+pip install -r requirements.txt
+python video_camera_server.py
+```
 
 ## Architecture
 
-### Edge Inference
+### Video chunk upload for observation & playback
+See video_camera_server.py
+```mermaid
+flowchart LR
+	beehive-entrance-video-processor --"upload video chunk"--> gate-video-stream
+```
+
+
+### Edge Inference (TODO)
 We separate webcam from inference mostly because inference is dockerized while webcam uses local window for preview.
 ```mermaid
 flowchart LR
@@ -20,14 +34,7 @@ flowchart LR
 	end
 ```
 
-### Video chunk upload for observation & playback
-See video_camera_server.py
-```mermaid
-flowchart LR
-	beehive-entrance-video-processor --"upload video chunk"--> gate-video-stream
-```
-
-### Distributed GPU inference assistance
+### Distributed GPU inference assistance (TODO)
 ```mermaid
 flowchart LR
 
@@ -40,11 +47,4 @@ flowchart LR
 	beehive-entrance-video-processor --"send inference results"--> gate-video-stream -- "store results long-term" --> mysql
 	
 	end
-```
-
-
-
-### Installation
-```
-pip3 install picamera requests requests_toolbelt
 ```
