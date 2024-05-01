@@ -9,8 +9,9 @@ FPS = 30
 WIDTH_PX = 1280
 HEIGHT_PX = 720
 
-# enable GPU acceleration
-cv2.CAP_GSTREAMER
+# Set CUDA backend for OpenCV
+cv2.cuda.setDevice(0)  # Specify GPU device
+cv2.cuda.printCudaDeviceInfo(0)  # Print CUDA device info
 
 camera = cv2.VideoCapture(0)
 
@@ -26,7 +27,7 @@ try:
         timestamp = int(datetime.datetime.now().timestamp())
         output_file = f'./cam/{timestamp}.mp4'
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_file, fourcc, FPS, (WIDTH_PX, HEIGHT_PX))
+        out = cv2.VideoWriter(output_file, fourcc, FPS, frameSize=(WIDTH_PX, HEIGHT_PX))
 
         start_time = time.time()
         while True:
@@ -34,12 +35,18 @@ try:
             if not ret:
                 print('breaking')
                 break
-            out.write(frame)
+            frameBGR = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+            # Convert to GPU Mat
+            gpu_frame = cv2.cuda_GpuMat()
+            gpu_frame.upload(frameBGR)
+            # Write GPU Mat to video file
+            out.write(cv2.cuda.cvtColor(gpu_frame, cv2.COLOR_BGR2RGB).download())
             cv2.imshow("Preview", frame)
             
             if cv2.waitKey(1) & 0xFF == ord('q') or time.time() - start_time >= 10:
                 out.release()
                 break
+        
 
 except KeyboardInterrupt:
     print("Recording and uploading stopped by user")
