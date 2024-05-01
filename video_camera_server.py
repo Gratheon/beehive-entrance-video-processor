@@ -52,7 +52,7 @@ def upload():
     # Prepare multipart/form-data request
     url = 'https://video.gratheon.com/graphql'
     headers = {
-        'Authorization': 'Bearer YOUR_ACCESS_TOKEN'
+        'Authorization': 'Bearer YOUR_API_TOKEN' # generate token in https://app.gratheon.com/account
     }
     payload = {
         'query': (
