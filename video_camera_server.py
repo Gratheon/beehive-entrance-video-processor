@@ -1,3 +1,4 @@
+import json
 import os
 import time
 import datetime
@@ -5,9 +6,46 @@ import cv2
 import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
+def upload(output_file: str):
+    # Make multipart/form-data request
+    response = requests.post(
+        'https://video.gratheon.com/graphql', 
+        headers={
+            'Authorization': 'Bearer ...' # generate token in https://app.gratheon.com/account
+        }, 
+        data={
+            "operations": json.dumps({
+                'query': (
+                    'mutation UploadVideo($file: Upload!, $boxId: ID!) {'
+                    '  uploadGateVideo(file: $file, boxId: $boxId)'
+                    '}'
+                ),
+                'variables': {
+                    'file': None,
+                    'boxId': '248'  # Replace with the actual box ID, take it from the URL of the beehive view with gate selected
+                }
+            }),
+            "map": json.dumps({ "0": ["variables.file"] })
+        },
+        files = {
+            "0": open(output_file, 'rb'), # Adjust content type if needed
+        },
+        timeout=120, 
+        allow_redirects=True
+    )
+
+    if response.status_code == 200:
+        print("Video uploaded successfully")
+    else:
+        print("Error uploading video:", response.status_code)
+        
+    print(response.text)
+
+
+
 FPS = 30
-WIDTH_PX = 1280
-HEIGHT_PX = 720
+WIDTH_PX = 640
+HEIGHT_PX = 480
 
 # enable GPU acceleration
 cv2.CAP_GSTREAMER
@@ -41,40 +79,16 @@ try:
                 out.release()
                 break
 
+        upload(output_file)
+
+        # remove file after uploading, you can leave it if you want a local cache
+        # but you need enough storage to not run out of space
+        os.remove(output_file)
+
 except KeyboardInterrupt:
     print("Recording and uploading stopped by user")
 
 finally:
+    os.remove(output_file)
     camera.release()
     cv2.destroyAllWindows()
-
-def upload():
-    # Prepare multipart/form-data request
-    url = 'https://video.gratheon.com/graphql'
-    headers = {
-        'Authorization': 'Bearer YOUR_API_TOKEN' # generate token in https://app.gratheon.com/account
-    }
-    payload = {
-        'query': (
-            'mutation UploadVideo($file: Upload!, $boxId: ID!) {'
-            '  uploadGateVideo(file: $file, boxId: $boxId)'
-            '}'
-        ),
-        'variables': {
-            'boxId': '123'  # Replace with the actual box ID
-        }
-    }
-    files = {
-        'file': (output_file, open(output_file, 'rb'), 'video/mp4')  # Adjust content type if needed
-    }
-    multipart_data = MultipartEncoder(fields=files, boundary='----MyBoundary')
-
-    # Make multipart/form-data request
-    response = requests.post(url, headers=headers, data=multipart_data,
-                                params=payload, timeout=30, allow_redirects=True)
-
-    if response.status_code == 200:
-        print("Video uploaded successfully")
-        os.remove(output_file)
-    else:
-        print("Error uploading video:", response.status_code)
