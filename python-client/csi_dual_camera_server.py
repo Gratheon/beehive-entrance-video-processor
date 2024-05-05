@@ -1,16 +1,3 @@
-# MIT License
-# Copyright (c) 2019-2022 JetsonHacks
-
-# A simple code snippet
-# Using two  CSI cameras (such as the Raspberry Pi Version 2) connected to a
-# NVIDIA Jetson Nano Developer Kit with two CSI ports (Jetson Nano, Jetson Xavier NX) via OpenCV
-# Drivers for the camera and OpenCV are included in the base image in JetPack 4.3+
-
-# This script will open a window and place the camera stream from each camera in a window
-# arranged horizontally.
-# The camera streams are each read in their own thread, as when done sequentially there
-# is a noticeable lag
-
 import os
 import cv2
 import threading
@@ -107,14 +94,16 @@ def gstreamer_pipeline(
     capture_height=1080,
     display_width=1920,
     display_height=1080,
-    framerate=30,
+    framerate=60,
     flip_method=0,
+    framerateout=30
 ):
     return (
-        "nvarguscamerasrc sensor-id=%d ! "
+        "nvarguscamerasrc sensor-id=%d gainrange=\"1.0 3.0\" ispdigitalgainrange='1 1' exposurecompensation=1 aeantibanding=1 ! " # gainrange=\"1.0 3.0\" ispdigitalgainrange='1 1' exposurecompensation=1 aeantibanding=1
         "video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, framerate=(fraction)%d/1 ! "
         "nvvidconv flip-method=%d ! "
-        "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx ! "
+        "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx, framerate=(fraction)%d/1 ! "
+        "videobalance saturation=1.2 ! "
         "videoconvert ! "
         "video/x-raw, format=(string)BGR ! appsink"
         % (
@@ -125,6 +114,7 @@ def gstreamer_pipeline(
             flip_method,
             display_width,
             display_height,
+            framerateout
         )
     )
 
@@ -151,20 +141,20 @@ def run_cameras():
     )
     left_camera.start()
 
-    right_camera = CSI_Camera()
-    right_camera.open(
-        gstreamer_pipeline(
-            sensor_id=1,
-            capture_width=1920,
-            capture_height=1080,
-            flip_method=0,
-            display_width=WIDTH_PX,
-            display_height=HEIGHT_PX,
-        )
-    )
-    right_camera.start()
+    # right_camera = CSI_Camera()
+    # right_camera.open(
+    #     gstreamer_pipeline(
+    #         sensor_id=1,
+    #         capture_width=1920,
+    #         capture_height=1080,
+    #         flip_method=0,
+    #         display_width=WIDTH_PX,
+    #         display_height=HEIGHT_PX,
+    #     )
+    # )
+    # right_camera.start()
 
-    if left_camera.video_capture.isOpened() and right_camera.video_capture.isOpened():    
+    if left_camera.video_capture.isOpened(): # and right_camera.video_capture.isOpened():    
         cv2.namedWindow(window_title, cv2.WINDOW_AUTOSIZE)
 
         try:
@@ -175,8 +165,12 @@ def run_cameras():
                 output_file = f'/home/gratheon/Desktop/gratheon/python-client/cam/{timestamp}.mp4'
 
                 writer = cv2.VideoWriter(
-                    f'appsrc ! video/x-raw, format=BGR ! videoconvert ! x264enc tune=zerolatency bitrate=3000 speed-preset=superfast ! video/x-h264, stream-format=byte-stream ! h264parse ! mp4mux ! filesink location={output_file}',
-                      cv2.CAP_GSTREAMER, 0, OUT_FPS,(WIDTH_PX,HEIGHT_PX))
+                    f'appsrc ! video/x-raw, format=BGR ! videoconvert ! nvvidconv ! video/x-raw(memory:NVMM), format=I420 ! nvvidconv ! video/x-raw, format=I420 ! omxh264enc ! video/x-h264, stream-format=byte-stream ! h264parse ! mp4mux ! filesink location={output_file}',
+                    cv2.CAP_GSTREAMER, 0, OUT_FPS,(WIDTH_PX,HEIGHT_PX))
+                    
+                # writer = cv2.VideoWriter(
+                #     f'appsrc ! video/x-raw, format=BGR ! videoconvert ! x264enc tune=zerolatency bitrate=3000 speed-preset=superfast ! video/x-h264, stream-format=byte-stream ! h264parse ! mp4mux ! filesink location={output_file}',
+                #       cv2.CAP_GSTREAMER, 0, OUT_FPS,(WIDTH_PX,HEIGHT_PX))
 
                 if not writer.isOpened():
                     print("Failed to open output")
@@ -191,9 +185,10 @@ def run_cameras():
                 lastCycleTime = time.time()
                 while True:
                     _, left_image = left_camera.read()
-                    _, right_image = right_camera.read()
+                    # _, right_image = right_camera.read()
+
                     # Use numpy to place images next to each other
-                    camera_images = np.hstack((left_image, right_image)) 
+                    # camera_images = np.hstack((left_image, right_image)) 
 
 
                     if left_image is None:
@@ -212,7 +207,8 @@ def run_cameras():
                     # Under GTK+ (Jetson Default), WND_PROP_VISIBLE does not work correctly. Under Qt it does
                     # GTK - Substitute WND_PROP_AUTOSIZE to detect if window has been closed by user
                     if cv2.getWindowProperty(window_title, cv2.WND_PROP_AUTOSIZE) >= 0:
-                        cv2.imshow(window_title, camera_images)
+                        cv2.imshow(window_title, left_image)
+                        # cv2.imshow(window_title, camera_images)
                     else:
                         break
 
@@ -223,7 +219,7 @@ def run_cameras():
 
                     # exit on escape or q
                     if cv2.waitKey(30) & 0xFF == 27 or cv2.waitKey(1) & 0xFF == ord('q') or isVideoLengthReached:
-                        # writer.release()
+                        writer.release()
                         break
 
             
@@ -232,22 +228,19 @@ def run_cameras():
                 # remove file after uploading, you can leave it if you want a local cache
                 # but you need enough storage to not run out of space
                 os.remove(output_file)
-
-            writer.release()
         finally:
 
             left_camera.stop()
             left_camera.release()
-            right_camera.stop()
-            right_camera.release()
+            # right_camera.stop()
+            # right_camera.release()
         cv2.destroyAllWindows()
     else:
         print("Error: Unable to open both cameras")
         left_camera.stop()
         left_camera.release()
-        right_camera.stop()
-        right_camera.release()
-
+        # right_camera.stop()
+        # right_camera.release()
 
 
 if __name__ == "__main__":
