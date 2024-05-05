@@ -23,7 +23,7 @@ cv2.namedWindow("Preview", cv2.WINDOW_NORMAL)
 try:
     while True:
         timestamp = int(datetime.datetime.now().timestamp())
-        output_file = f'./cam/{timestamp}.mp4'
+        output_file = f'./python-client/cam/{timestamp}.mp4'
         fourcc = cv2.VideoWriter_fourcc(*'mp4v')
         out = cv2.VideoWriter(output_file, fourcc, FPS, (WIDTH_PX, HEIGHT_PX))
 

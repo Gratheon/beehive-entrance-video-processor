@@ -1,25 +1,12 @@
-# MIT License
-# Copyright (c) 2019-2022 JetsonHacks
-
-# A simple code snippet
-# Using two  CSI cameras (such as the Raspberry Pi Version 2) connected to a
-# NVIDIA Jetson Nano Developer Kit with two CSI ports (Jetson Nano, Jetson Xavier NX) via OpenCV
-# Drivers for the camera and OpenCV are included in the base image in JetPack 4.3+
-
-# This script will open a window and place the camera stream from each camera in a window
-# arranged horizontally.
-# The camera streams are each read in their own thread, as when done sequentially there
-# is a noticeable lag
-
+import os
 import cv2
 import threading
 import numpy as np
 import datetime
 import time
-
+from uploader import upload
 
 class CSI_Camera:
-
     def __init__(self):
         # Initialize instance variables
         # OpenCV video capture element
@@ -127,8 +114,8 @@ def gstreamer_pipeline(
     )
 
 FPS = 30
-WIDTH_PX = 960 # 640 # 1920
-HEIGHT_PX = 540 # 480 # 1080
+WIDTH_PX = 640 # 960 # 640 # 1920
+HEIGHT_PX = 360 # 540 # 480 # 1080
 VIDEO_FILE_MAX_DURATION_SEC = 10
 
 def run_cameras():
@@ -159,20 +146,16 @@ def run_cameras():
     )
     right_camera.start()
 
-    if left_camera.video_capture.isOpened() and right_camera.video_capture.isOpened():
-        # write to file
-        timestamp = int(datetime.datetime.now().timestamp())
-        output_file = f'./cam/{timestamp}.mp4'
-        out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc(*'mp4v'), FPS, (WIDTH_PX, HEIGHT_PX))
-    
+    if left_camera.video_capture.isOpened() and right_camera.video_capture.isOpened():    
         cv2.namedWindow(window_title, cv2.WINDOW_AUTOSIZE)
 
         try:
 
             # video writing loop
             while True:
+                # write to file
                 timestamp = int(datetime.datetime.now().timestamp())
-                output_file = f'./cam/{timestamp}.mp4'
+                output_file = f'./python-client/cam/{timestamp}.mp4'
                 out = cv2.VideoWriter(output_file, cv2.VideoWriter_fourcc(*'mp4v'), FPS, (WIDTH_PX, HEIGHT_PX))
 
                 start_time = time.time()
@@ -200,8 +183,9 @@ def run_cameras():
 
                     isVideoLengthReached = time.time() - start_time >= VIDEO_FILE_MAX_DURATION_SEC
 
-                    # Stop the program on the ESC key
-                    if keyCode == 27 | isVideoLengthReached:
+                    # exit on escape or q
+                    if cv2.waitKey(30) & 0xFF == 27 or cv2.waitKey(1) & 0xFF == ord('q') or isVideoLengthReached:
+                        out.release()
                         break
 
                 upload(output_file)
