@@ -227,11 +227,11 @@ def run_cameras():
                         break
 
             
-                #upload(output_file)
+                upload(output_file)
 
                 # remove file after uploading, you can leave it if you want a local cache
                 # but you need enough storage to not run out of space
-                # os.remove(output_file)
+                os.remove(output_file)
 
             writer.release()
         finally:
