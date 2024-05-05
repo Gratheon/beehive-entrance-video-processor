@@ -4,8 +4,13 @@ import threading
 import numpy as np
 import datetime
 import time
-from uploader import upload
+from uploader import uploadAndRemove
 
+
+def upload_file_async(file_path):
+    # Define a function to upload the file asynchronously
+    upload_thread = threading.Thread(target=uploadAndRemove, args=(file_path,))
+    upload_thread.start()
 
 class CSI_Camera:
 
@@ -96,6 +101,7 @@ def gstreamer_pipeline(
     display_height=1080,
     framerate=60,
     flip_method=0,
+    noise_reduction=0,
     framerateout=30
 ):
     return (
@@ -223,11 +229,8 @@ def run_cameras():
                         break
 
             
-                upload(output_file)
-
-                # remove file after uploading, you can leave it if you want a local cache
-                # but you need enough storage to not run out of space
-                os.remove(output_file)
+                #upload(output_file)
+                upload_file_async(output_file)
         finally:
 
             left_camera.stop()

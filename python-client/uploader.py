@@ -6,7 +6,7 @@ import cv2
 import requests
 from requests_toolbelt.multipart.encoder import MultipartEncoder
 
-def upload(output_file: str):
+def uploadAndRemove(output_file: str):
     # Retrieve environment variables
     bearer_token = os.getenv("API_TOKEN")
     box_id = os.getenv("BOX_ID")
@@ -48,4 +48,8 @@ def upload(output_file: str):
         print("Error uploading video:", response.status_code)
         
     print(response.text)
+
+    # remove file after uploading, you can leave it if you want a local cache
+    # but you need enough storage to not run out of space
+    os.remove(output_file)
 
