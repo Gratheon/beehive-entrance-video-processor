@@ -95,6 +95,14 @@ Default 1920x1080
 
 def gstreamer_pipeline(
     sensor_id=0,
+    
+
+# 0 - 3264 x 2464 @ 21fps gain 1-10
+# 1 - 3264 x 1848 @ 28 fps gain 1-10
+# 2 - 1920 x 1080 @ 30 fps gain 1-10
+# 3 - 1280 x 720 @ 60 fps gain 1-10
+# 4 - 1280 x 720 @ 120 fps gain 1-10
+    sensor_mode=3,
     capture_width=1920,
     capture_height=1080,
     display_width=1920,
@@ -105,7 +113,7 @@ def gstreamer_pipeline(
     framerateout=30
 ):
     return (
-        "nvarguscamerasrc sensor-id=%d gainrange=\"1.0 3.0\" ispdigitalgainrange='1 1' exposurecompensation=1 aeantibanding=1 ! " # gainrange=\"1.0 3.0\" ispdigitalgainrange='1 1' exposurecompensation=1 aeantibanding=1
+        "nvarguscamerasrc sensor-id=%d sensor-mode=%d gainrange=\"1.0 3.0\" ispdigitalgainrange='1 1' exposurecompensation=1 aeantibanding=1 ! " # gainrange=\"1.0 3.0\" ispdigitalgainrange='1 1' exposurecompensation=1 aeantibanding=1
         "video/x-raw(memory:NVMM), width=(int)%d, height=(int)%d, framerate=(fraction)%d/1 ! "
         "nvvidconv flip-method=%d ! "
         "video/x-raw, width=(int)%d, height=(int)%d, format=(string)BGRx, framerate=(fraction)%d/1 ! "
@@ -114,6 +122,7 @@ def gstreamer_pipeline(
         "video/x-raw, format=(string)BGR ! appsink"
         % (
             sensor_id,
+            sensor_mode,
             capture_width,
             capture_height,
             framerate,
@@ -125,10 +134,10 @@ def gstreamer_pipeline(
     )
 
 FPS = 30
-OUT_FPS = 15 # jetson is not good at writing to disk apparently, so it needs time
+OUT_FPS = 30 # jetson is not good at writing to disk apparently, so it needs time
 
 WIDTH_PX = 640 # 960 # 640 # 1920
-HEIGHT_PX = 360 # 540 # 480 # 1080
+HEIGHT_PX = 480 #360 # 540 # 480 # 1080
 VIDEO_FILE_MAX_DURATION_SEC = 10
 
 def run_cameras():
@@ -137,8 +146,8 @@ def run_cameras():
     left_camera.open(
         gstreamer_pipeline(
             sensor_id=0,
-            capture_width=1920,
-            capture_height=1080,
+            capture_width=960, #1920,
+            capture_height=540, #1080,
             flip_method=0,
             framerate=FPS,
             display_width=WIDTH_PX, #960,
@@ -147,18 +156,19 @@ def run_cameras():
     )
     left_camera.start()
 
-    # right_camera = CSI_Camera()
-    # right_camera.open(
-    #     gstreamer_pipeline(
-    #         sensor_id=1,
-    #         capture_width=1920,
-    #         capture_height=1080,
-    #         flip_method=0,
-    #         display_width=WIDTH_PX,
-    #         display_height=HEIGHT_PX,
-    #     )
-    # )
-    # right_camera.start()
+    right_camera = CSI_Camera()
+    right_camera.open(
+        gstreamer_pipeline(
+            sensor_id=1,
+            capture_width=960, #1920,
+            capture_height=540, #1080,
+            flip_method=0,
+            framerate=FPS,
+            display_width=WIDTH_PX, #960,
+            display_height=HEIGHT_PX, #540,
+        )
+    )
+    right_camera.start()
 
     if left_camera.video_capture.isOpened(): # and right_camera.video_capture.isOpened():    
         cv2.namedWindow(window_title, cv2.WINDOW_AUTOSIZE)
@@ -174,10 +184,6 @@ def run_cameras():
                     f'appsrc ! video/x-raw, format=BGR ! videoconvert ! nvvidconv ! video/x-raw(memory:NVMM), format=I420 ! nvvidconv ! video/x-raw, format=I420 ! omxh264enc ! video/x-h264, stream-format=byte-stream ! h264parse ! mp4mux ! filesink location={output_file}',
                     cv2.CAP_GSTREAMER, 0, OUT_FPS,(WIDTH_PX,HEIGHT_PX))
                     
-                # writer = cv2.VideoWriter(
-                #     f'appsrc ! video/x-raw, format=BGR ! videoconvert ! x264enc tune=zerolatency bitrate=3000 speed-preset=superfast ! video/x-h264, stream-format=byte-stream ! h264parse ! mp4mux ! filesink location={output_file}',
-                #       cv2.CAP_GSTREAMER, 0, OUT_FPS,(WIDTH_PX,HEIGHT_PX))
-
                 if not writer.isOpened():
                     print("Failed to open output")
                     exit()
@@ -191,10 +197,10 @@ def run_cameras():
                 lastCycleTime = time.time()
                 while True:
                     _, left_image = left_camera.read()
-                    # _, right_image = right_camera.read()
+                    _, right_image = right_camera.read()
 
                     # Use numpy to place images next to each other
-                    # camera_images = np.hstack((left_image, right_image)) 
+                    camera_images = np.hstack((left_image, right_image)) 
 
 
                     if left_image is None:
@@ -205,26 +211,25 @@ def run_cameras():
                     lastCycleTime = time.time()
 
                     if(isFrameDelayElapsed):
-                        print(time.time() - lastFrameWrite)
+                        print(f'fps:{1/(time.time() - lastFrameWrite)} time: {time.time() - lastFrameWrite}')
                         writer.write(left_image)
+                        # writer.write(right_image)
                         lastFrameWrite = time.time()
 
                     # Check to see if the user closed the window
                     # Under GTK+ (Jetson Default), WND_PROP_VISIBLE does not work correctly. Under Qt it does
                     # GTK - Substitute WND_PROP_AUTOSIZE to detect if window has been closed by user
                     if cv2.getWindowProperty(window_title, cv2.WND_PROP_AUTOSIZE) >= 0:
-                        cv2.imshow(window_title, left_image)
-                        # cv2.imshow(window_title, camera_images)
+                        # cv2.imshow(window_title, left_image)
+                        cv2.imshow(window_title, camera_images)
                     else:
                         break
 
-                    # This also acts as
-                    keyCode = cv2.waitKey(30) & 0xFF
 
                     isVideoLengthReached = time.time() - start_time >= VIDEO_FILE_MAX_DURATION_SEC
 
                     # exit on escape or q
-                    if cv2.waitKey(30) & 0xFF == 27 or cv2.waitKey(1) & 0xFF == ord('q') or isVideoLengthReached:
+                    if cv2.waitKey(5) & 0xFF == 27 or cv2.waitKey(1) & 0xFF == ord('q') or isVideoLengthReached:
                         writer.release()
                         break
 
@@ -235,15 +240,15 @@ def run_cameras():
 
             left_camera.stop()
             left_camera.release()
-            # right_camera.stop()
-            # right_camera.release()
+            right_camera.stop()
+            right_camera.release()
         cv2.destroyAllWindows()
     else:
         print("Error: Unable to open both cameras")
         left_camera.stop()
         left_camera.release()
-        # right_camera.stop()
-        # right_camera.release()
+        right_camera.stop()
+        right_camera.release()
 
 
 if __name__ == "__main__":
