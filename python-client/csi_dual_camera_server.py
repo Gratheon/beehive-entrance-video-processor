@@ -4,13 +4,7 @@ import threading
 import numpy as np
 import datetime
 import time
-from uploader import uploadAndRemove
-
-
-def upload_file_async(file_path):
-    # Define a function to upload the file asynchronously
-    upload_thread = threading.Thread(target=uploadAndRemove, args=(file_path,))
-    upload_thread.start()
+from uploader import upload_file_async
 
 class CSI_Camera:
 
@@ -233,8 +227,6 @@ def run_cameras():
                         writer.release()
                         break
 
-            
-                #upload(output_file)
                 upload_file_async(output_file)
         finally:
 

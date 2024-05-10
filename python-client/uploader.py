@@ -4,7 +4,14 @@ import time
 import datetime
 import cv2
 import requests
+import threading
 from requests_toolbelt.multipart.encoder import MultipartEncoder
+
+
+def upload_file_async(file_path):
+    # Define a function to upload the file asynchronously
+    upload_thread = threading.Thread(target=uploadAndRemove, args=(file_path,))
+    upload_thread.start()
 
 def uploadAndRemove(output_file: str):
     # Retrieve environment variables
