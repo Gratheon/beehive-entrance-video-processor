@@ -1,11 +1,12 @@
 import json
 import os
 import time
-import datetime
 import cv2
 import requests
 import threading
 from requests_toolbelt.multipart.encoder import MultipartEncoder
+import glob
+from datetime import datetime, timedelta
 
 
 def upload_file_async(file_path):
@@ -58,5 +59,19 @@ def uploadAndRemove(output_file: str):
 
     # remove file after uploading, you can leave it if you want a local cache
     # but you need enough storage to not run out of space
-    os.remove(output_file)
+    # os.remove(output_file)
+    
+    delete_old_mp4_files()
 
+
+def delete_old_mp4_files():
+    directory = "./cam"
+    max_age_hours = 1
+    now = datetime.now()
+    max_age = timedelta(hours=max_age_hours)
+    
+    for file_path in glob.glob(os.path.join(directory, '*.mp4')):
+        file_mtime = datetime.fromtimestamp(os.path.getmtime(file_path))
+        if now - file_mtime > max_age:
+            os.remove(file_path)
+            print(f"Deleted {file_path}")

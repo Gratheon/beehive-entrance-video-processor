@@ -4,7 +4,7 @@ import threading
 import numpy as np
 import datetime
 import time
-from uploader import upload_file_async
+from uploader import upload_file_async, delete_old_mp4_files
 
 class CSI_Camera:
 
@@ -196,6 +196,20 @@ def run_cameras():
                     # Use numpy to place images next to each other
                     camera_images = np.hstack((left_image, right_image)) 
 
+                    # Check to see if the user closed the window
+                    # Under GTK+ (Jetson Default), WND_PROP_VISIBLE does not work correctly. Under Qt it does
+                    # GTK - Substitute WND_PROP_AUTOSIZE to detect if window has been closed by user
+                    if cv2.getWindowProperty(window_title, cv2.WND_PROP_AUTOSIZE) >= 0:
+                        # cv2.imshow(window_title, left_image)
+                        cv2.imshow(window_title, camera_images)
+                    else:
+                        break
+                    
+                    if not is_day_time():
+                        print("night time, skipping video storage & upload")
+                        cv2.waitKey(5)
+                        writer.release()
+                        continue
 
                     if left_image is None:
                         break
@@ -210,15 +224,6 @@ def run_cameras():
                         # writer.write(right_image)
                         lastFrameWrite = time.time()
 
-                    # Check to see if the user closed the window
-                    # Under GTK+ (Jetson Default), WND_PROP_VISIBLE does not work correctly. Under Qt it does
-                    # GTK - Substitute WND_PROP_AUTOSIZE to detect if window has been closed by user
-                    if cv2.getWindowProperty(window_title, cv2.WND_PROP_AUTOSIZE) >= 0:
-                        # cv2.imshow(window_title, left_image)
-                        cv2.imshow(window_title, camera_images)
-                    else:
-                        break
-
 
                     isVideoLengthReached = time.time() - start_time >= VIDEO_FILE_MAX_DURATION_SEC
 
@@ -227,7 +232,8 @@ def run_cameras():
                         writer.release()
                         break
 
-                upload_file_async(output_file)
+                if is_day_time():
+                    upload_file_async(output_file)
         finally:
 
             left_camera.stop()
@@ -242,6 +248,11 @@ def run_cameras():
         right_camera.stop()
         right_camera.release()
 
+def is_day_time():
+    current_time = datetime.datetime.now().time()
+    return current_time >= datetime.time(8, 0) and current_time < datetime.time(18, 0)
+
 
 if __name__ == "__main__":
+    delete_old_mp4_files()
     run_cameras()
