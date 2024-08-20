@@ -4,6 +4,10 @@ Beehive entrance video processing service. Manages video inferencing. Can be dep
 
 ## Installation & Usage
 
+``` 
+git clone https://github.com/Gratheon/beehive-entrance-video-processor.git
+```
+
 ### Jetson Nano with dual CSI cameras
 - Generate API token in https://app.gratheon.com/account
 - Open your hive entrance view, ex https://app.gratheon.com/apiaries/55/hives/68/box/250 and use BOX_ID from the end of URL, ex. 250.
