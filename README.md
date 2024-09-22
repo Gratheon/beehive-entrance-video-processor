@@ -4,7 +4,9 @@ Beehive entrance video processing service. Manages video inferencing.
 Intended to be deployed on edge on NVidia Jetson Orin or NVidia Jetson Nano
 
 
-https://github.com/user-attachments/assets/687531ce-856a-4df4-a56a-89010b41f89a
+
+https://github.com/user-attachments/assets/a3243245-34a8-4626-a990-f7e34b7b8ff6
+
 
 
 ## Features
