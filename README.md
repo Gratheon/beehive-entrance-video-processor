@@ -1,26 +1,31 @@
 # gratheon / entrance-observer
 
-Beehive entrance video processing service. Manages video inferencing. Can be deployed on edge
+Beehive entrance video processing service. Manages video inferencing. 
+Intended to be deployed on edge on NVidia Jetson Orin or NVidia Jetson Nano
+
+
+https://github.com/user-attachments/assets/687531ce-856a-4df4-a56a-89010b41f89a
+
 
 ## Features
 
+- Uses 4K USB video camera stream as input, stores it into 10 sec chunks
+  - Tried dual CSI cameras too, it could work too, but quality was not sufficient
 - Uploads video chunks to gratheon web-app for playback
+- Runs bee detection
 
 ## Installation & Usage
 
 ```
 git clone https://github.com/Gratheon/entrance-observer.git
 ```
-
-### Jetson Nano with dual CSI cameras
-
 - Generate API token in https://app.gratheon.com/account
 - Open your hive entrance view, ex https://app.gratheon.com/apiaries/55/hives/68/box/250 and use BOX_ID from the end of URL, ex. 250.
 - Pass these environment params:
 
 ```bash
 python3 -m pip install -r requirements.txt
-API_TOKEN=... BOX_ID=... && python3 python-client/video_camera_server.py
+API_TOKEN=... BOX_ID=... && python3 video_camera_server.py
 ```
 
 ## Architecture
