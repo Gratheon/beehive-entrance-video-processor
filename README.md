@@ -2,6 +2,10 @@
 
 Beehive entrance video processing service. Manages video inferencing. Can be deployed on edge
 
+## Features
+
+- Uploads video chunks to gratheon web-app for playback
+
 ## Installation & Usage
 
 ```
